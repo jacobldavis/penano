@@ -2,7 +2,7 @@ PENANO 🎹✋🎶
 
 PENANO is a virtual piano controlled by your hands.
 Using MediaPipe hand tracking, YOLO object detection, and a real-time audio engine, it lets you play piano notes by moving your fingers in front of a camera.
-You can also record your playing, save it as MP3, and even generate music using Suno AI’s API.
+You can also record your playing, save it as MP3, and generate music using Suno AI’s API based off the notes you played.
 
 ✨ Features
 
@@ -25,3 +25,9 @@ R → Start/stop recording
 Q → Quit and save
 
 🤖 Suno AI integration – generate AI-composed music from detected notes
+
+![alt text](images/ui.png)
+
+![alt text](images/data_labeling.png)
+
+![alt text](images/hardwaresetup.jpg)
