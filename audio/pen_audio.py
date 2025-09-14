@@ -2,6 +2,90 @@ import numpy as np
 import sounddevice as sd # type: ignore
 import threading
 import time
+import wave
+from pydub import AudioSegment
+import os
+from datetime import datetime
+
+class AudioRecorder:
+    def __init__(self, sample_rate=44100):
+        self.sample_rate = sample_rate
+        self.recording = False
+        self.audio_data = []
+        self.lock = threading.Lock()
+        
+    def start_recording(self):
+        """Start recording audio"""
+        with self.lock:
+            self.recording = True
+            self.audio_data = []
+            print("Recording started...")
+            
+    def stop_recording(self):
+        """Stop recording audio"""
+        with self.lock:
+            self.recording = False
+            print("Recording stopped...")
+            
+    def is_recording(self):
+        """Check if currently recording"""
+        return self.recording
+            
+    def add_audio_data(self, data):
+        """Add audio data to the recording buffer"""
+        if self.recording:
+            with self.lock:
+                # Convert to mono if needed and store as copy
+                if len(data.shape) > 1:
+                    audio_mono = data[:, 0].copy()
+                else:
+                    audio_mono = data.copy()
+                self.audio_data.append(audio_mono)
+                
+    def save_to_mp3(self, filename=None):
+        """Save recorded audio to MP3 file"""
+        if not self.audio_data:
+            print("No audio data to save!")
+            return None
+            
+        if filename is None:
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            filename = f"piano_recording_{timestamp}.mp3"
+            
+        try:
+            # Concatenate all audio data
+            with self.lock:
+                audio_array = np.concatenate(self.audio_data, axis=0)
+            
+            # Normalize audio to prevent clipping
+            max_val = np.max(np.abs(audio_array))
+            if max_val > 0:
+                audio_array = audio_array / max_val * 0.8  # Leave some headroom
+            
+            # Convert to 16-bit integers
+            audio_16bit = (audio_array * 32767).astype(np.int16)
+            
+            # Save as WAV first (temporary file)
+            wav_filename = filename.replace('.mp3', '.wav')
+            with wave.open(wav_filename, 'w') as wav_file:
+                wav_file.setnchannels(1)  # Mono
+                wav_file.setsampwidth(2)  # 16-bit
+                wav_file.setframerate(self.sample_rate)
+                wav_file.writeframes(audio_16bit.tobytes())
+            
+            # Convert WAV to MP3 using pydub
+            audio_segment = AudioSegment.from_wav(wav_filename)
+            audio_segment.export(filename, format="mp3", bitrate="192k")
+            
+            # Clean up temporary WAV file
+            os.remove(wav_filename)
+            
+            print(f"Audio saved as: {filename}")
+            return filename
+            
+        except Exception as e:
+            print(f"Error saving audio: {e}")
+            return None
 
 class AudioMixer:
     def __init__(self, sample_rate=44100, block_size=1024):
@@ -124,10 +208,29 @@ class AudioMixer:
         with self.lock:
             return list(self.active_notes.keys())
 
+class RecordableAudioMixer(AudioMixer):
+    def __init__(self, sample_rate=44100, block_size=1024):
+        self.recorder = None
+        super().__init__(sample_rate, block_size)
+        
+    def set_recorder(self, recorder):
+        """Set the audio recorder"""
+        self.recorder = recorder
+        
+    def audio_callback(self, outdata, frames, time, status):
+        """Enhanced audio callback that also records"""
+        # Call the original audio generation
+        super().audio_callback(outdata, frames, time, status)
+        
+        # If recorder is set and recording, capture the audio
+        if self.recorder and self.recorder.is_recording():
+            self.recorder.add_audio_data(outdata)
+
 # Piano frequencies
+freq_multiplier = 16
 P_FREQ = {
-    "C": 261.63, "C#": 277.18, "Db": 277.18,
-    "D": 293.66, "D#": 311.13, "Eb": 311.13, "E": 329.63, "F": 349.23,
-    "F#": 369.99, "Gb": 369.99, "G": 392.00, "G#": 415.30, "Ab": 415.30,
-    "A": 440.00, "A#": 466.16, "Bb": 466.16, "B": 493.88
+    "C": 32.70, "C#": 34.65, "Db": 34.65,
+    "D": 36.71, "D#": 38.89, "Eb": 38.89, "E": 41.20, "F": 43.65,
+    "F#": 46.25, "Gb": 46.25, "G": 49.00, "G#": 51.91, "Ab": 51.91,
+    "A": 55.00, "A#": 58.27, "Bb": 58.27, "B": 61.74
 }

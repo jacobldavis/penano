@@ -1,8 +1,14 @@
-from audio.pen_audio import AudioMixer, P_FREQ
+from audio.pen_audio import *
 from ultralytics import YOLO # type: ignore
 import cv2
 import random
 import mediapipe as mp # type: ignore
+import numpy as np
+import wave
+import threading
+from pydub import AudioSegment
+import os
+from datetime import datetime
 
 def getColours(cls_num):
     """Generate unique colors for each class ID"""
@@ -37,8 +43,10 @@ hands = mp_hands.Hands(
     min_tracking_confidence=0.5
 )
 
-# Initialize audio mixer
-mixer = AudioMixer(sample_rate=44100, block_size=512)
+# Initialize audio recorder and mixer
+recorder = AudioRecorder(sample_rate=44100)
+mixer = RecordableAudioMixer(sample_rate=44100, block_size=512)
+mixer.set_recorder(recorder)
 
 # Load YOLO model
 model = YOLO("Train_Yolo/my_model.pt")
@@ -56,6 +64,12 @@ rectangles = []
 # Keep track of which notes were previously touched
 previous_touched_notes = []
 
+print("Controls:")
+print("- Press 'w' to detect piano keys")
+print("- Press 'r' to start/stop recording")
+print("- Press 'q' to quit")
+print("- Touch detected piano keys with your fingers to play!")
+
 try:
     while True:
         ret, frame = cap.read()
@@ -66,6 +80,7 @@ try:
         height, width, _ = frame.shape
         
         key = cv2.waitKey(1) & 0xFF
+        
         if key == ord('w'):
             # Reset rectangles and detect new ones
             rectangles = []
@@ -82,6 +97,17 @@ try:
                         note = class_name
                         # Store rectangle information with note
                         rectangles.append((x1, y1, x2, y2, colour, class_name, conf, note))
+            print(f"Detected {len(rectangles)} piano keys")
+        
+        elif key == ord('r'):
+            # Toggle recording
+            if not recorder.is_recording():
+                recorder.start_recording()
+            else:
+                recorder.stop_recording()
+                filename = recorder.save_to_mp3("recording.mp3")
+                if filename:
+                    print(f"Recording saved as: {filename}")
         
         # Process hand detection
         rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
@@ -148,13 +174,18 @@ try:
         if active_notes:
             notes_text = "Playing: " + ", ".join(active_notes)
             cv2.putText(frame, notes_text, 
-                       (10, height - 20), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 0), 2)
+                       (10, height - 30), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 0), 2)
+        
+        # Display recording status
+        if recorder.is_recording():
+            cv2.putText(frame, "● REC", 
+                       (width - 80, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 255), 2)
         
         # Display instructions
-        cv2.putText(frame, "Press 'q' to quit", 
-                    (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
-        cv2.putText(frame, f"Keys: {len(rectangles)}", 
-                    (10, 90), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (200, 200, 200), 2)
+        cv2.putText(frame, "Controls: 'w'=detect keys, 'r'=record, 'q'=quit", 
+                    (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
+        cv2.putText(frame, f"Piano Keys: {len(rectangles)}", 
+                    (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (200, 200, 200), 2)
         
         # Display the frame
         cv2.imshow("PENANO", frame)
@@ -164,7 +195,14 @@ try:
 
 finally:
     # Cleanup
+    if recorder.is_recording():
+        recorder.stop_recording()
+        filename = recorder.save_to_mp3()
+        if filename:
+            print(f"Final recording saved as: {filename}")
+    
     mixer.cleanup()
     cap.release()
     cv2.destroyAllWindows()
     hands.close()
+    print("Application closed successfully!")
