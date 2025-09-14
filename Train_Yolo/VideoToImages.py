@@ -1,6 +1,9 @@
 import cv2
 import os
 
+# https://labelstud.io/
+# Use this to label the model
+
 def getVideo():
     # Open the default camera
     cam = cv2.VideoCapture(1)

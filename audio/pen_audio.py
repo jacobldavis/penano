@@ -91,7 +91,8 @@ class AudioMixer:
     def __init__(self, sample_rate=44100, block_size=1024):
         self.sample_rate = sample_rate
         self.block_size = block_size
-        self.active_notes = {} 
+        self.active_notes = {}
+        self.current_octave = 4  # Default octave
         self.lock = threading.Lock()
         self.running = True
         
@@ -155,23 +156,27 @@ class AudioMixer:
             mixed_audio = np.clip(mixed_audio, -1.0, 1.0)
             outdata[:, 0] = mixed_audio
             
-    def start_note(self, note_name, frequency):
-        """Start playing a continuous note"""
+    def set_octave(self, octave):
+        """Set the current octave (1-8)"""
+        self.current_octave = max(1, min(8, octave))
+
+    def start_note(self, note_name, base_frequency):
+        """Start playing a continuous note with octave adjustment"""
         with self.lock:
             if note_name not in self.active_notes:
+                # P_FREQ has base octive of one
+                frequency = base_frequency * (2 ** (self.current_octave - 1))
                 self.active_notes[note_name] = {
                     'frequency': frequency,
                     'phase': 0,
                     'start_time': time.time()
                 }
-                print(f"Started note: {note_name}")
                 
     def stop_note(self, note_name):
         """Stop playing a note"""
         with self.lock:
             if note_name in self.active_notes:
                 del self.active_notes[note_name]
-                print(f"Stopped note: {note_name}")
                 
     def update_notes(self, detected_keys):
         """
@@ -229,8 +234,8 @@ class RecordableAudioMixer(AudioMixer):
 # Piano frequencies
 freq_multiplier = 16
 P_FREQ = {
-    "C": 32.70, "C#": 34.65, "Db": 34.65,
-    "D": 36.71, "D#": 38.89, "Eb": 38.89, "E": 41.20, "F": 43.65,
-    "F#": 46.25, "Gb": 46.25, "G": 49.00, "G#": 51.91, "Ab": 51.91,
-    "A": 55.00, "A#": 58.27, "Bb": 58.27, "B": 61.74
+    "C": 16.35, "C#": 17.32, "Db": 17.32,
+    "D": 18.35, "D#": 19.45, "Eb": 19.45, "E": 20.6, "F": 21.83,
+    "F#": 23.12, "Gb": 23.12, "G": 24.5, "G#": 25.96, "Ab": 25.96,
+    "A": 27.5, "A#": 29.14, "Bb": 29.14, "B": 30.87
 }

@@ -3,6 +3,9 @@ import cv2
 import random
 import numpy as np
 
+# https://labelstud.io/
+# Use this to label the model
+
 def getColours(cls_num):
     """Generate unique colors for each class ID"""
     random.seed(cls_num)
