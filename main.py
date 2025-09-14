@@ -233,7 +233,7 @@ class PenanoApp:
         self.root.bind('r', lambda e: self.toggle_recording())
 
         # Initialize components
-        self.model = YOLO("Train_Yolo/my_model.pt")
+        self.model = YOLO("model/my_model.pt")
         self.hands = mp_hands.Hands(
             static_image_mode=False,
             max_num_hands=2,
