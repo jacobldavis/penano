@@ -255,6 +255,7 @@ class PenanoApp:
         self.root.bind('w', lambda e: self.toggle_detection())
 
         self.prompt = ""
+        self.mixer.set_octave(int(4))
 
     def change_camera(self):
         try:

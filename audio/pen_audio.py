@@ -3,7 +3,7 @@ import sounddevice as sd # type: ignore
 import threading
 import time
 import wave
-from pydub import AudioSegment
+from pydub import AudioSegment # type: ignore
 import os
 from datetime import datetime
 
